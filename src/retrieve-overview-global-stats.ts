@@ -18,7 +18,10 @@ export default async (event): Promise<any> => {
 		`,
 		);
 		const results: readonly GlobalStat[] = dbResults.map(result =>
-			Object.assign(new GlobalStat(), { ...result } as GlobalStat),
+			Object.assign(new GlobalStat(), {
+				...result,
+				value: Math.abs(result.value) < 1 ? result.value : Math.round(result.value),
+			} as GlobalStat),
 		);
 		const result = Object.assign(new GlobalStats(), {
 			stats: results,
