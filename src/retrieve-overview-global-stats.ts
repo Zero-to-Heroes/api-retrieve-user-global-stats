@@ -1,4 +1,4 @@
-import { Rds } from './db/rds';
+import db from './db/rds';
 import { GlobalStat } from './model/global-stat';
 import { GlobalStats } from './model/global-stats';
 
@@ -7,11 +7,11 @@ import { GlobalStats } from './model/global-stats';
 // [1]: https://aws.amazon.com/blogs/compute/node-js-8-10-runtime-now-available-in-aws-lambda/
 export default async (event): Promise<any> => {
 	try {
-		const rds = await Rds.getInstance();
 		console.log('input', JSON.stringify(event));
 		const userToken = event.pathParameters && event.pathParameters.proxy;
 		console.log('getting stats for user', userToken);
-		const dbResults = await rds.runQuery<readonly any[]>(
+		const mysql = await db.getConnection();
+		const dbResults = await mysql.query(
 			`
 			SELECT * FROM global_stats 
 			WHERE userId = '${userToken}'

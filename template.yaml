@@ -22,6 +22,7 @@ Resources:
             Timeout: 180
             Tracing: Active
             CodeUri: ./dist/retrieve-overview-global-stats
+            MemorySize: 128
             Policies:
                 - AWSLambdaVPCAccessExecutionRole
                 - AmazonSESFullAccess
