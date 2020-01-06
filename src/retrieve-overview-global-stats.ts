@@ -7,9 +7,9 @@ import { GlobalStats } from './model/global-stats';
 // [1]: https://aws.amazon.com/blogs/compute/node-js-8-10-runtime-now-available-in-aws-lambda/
 export default async (event): Promise<any> => {
 	try {
-		console.log('input', JSON.stringify(event));
+		// console.log('input', JSON.stringify(event));
 		const userToken = event.pathParameters && event.pathParameters.proxy;
-		console.log('getting stats for user', userToken);
+		// console.log('getting stats for user', userToken);
 		const mysql = await db.getConnection();
 		const dbResults = await mysql.query(
 			`
@@ -31,7 +31,7 @@ export default async (event): Promise<any> => {
 			isBase64Encoded: false,
 			body: JSON.stringify({ result }),
 		};
-		console.log('sending back success reponse', response);
+		// console.log('sending back success reponse', response);
 		return response;
 	} catch (e) {
 		console.error('issue retrieving stats', e);
