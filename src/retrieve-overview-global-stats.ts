@@ -10,14 +10,17 @@ export default async (event): Promise<any> => {
 	try {
 		const mysql = await db.getConnection();
 		const userInfo = JSON.parse(event.body);
-		const debug = userInfo && userInfo.userName === 'daedin';
+		const debug =
+			userInfo &&
+			(userInfo.userName === 'daedin' || userInfo.userId === 'OW_7fca23da-49df-4254-8ae7-fbee31e22373');
 		if (debug) {
-			console.log('debug mode');
+			console.log('debug mode', userInfo);
 		}
 		// console.log('input', JSON.stringify(event));
 		let selectClause = '';
 		if (userInfo) {
 			console.log('retrieving from userInfo', userInfo);
+			// Hacky, but that's the only place where we have all three to make the links
 			const uniqueIdentifiers = await mysql.query(
 				`
 					SELECT DISTINCT userName, userId, userMachineId 
@@ -27,27 +30,40 @@ export default async (event): Promise<any> => {
 						OR userMachineId = '${userInfo.machineId || '__invalid__'}'
 				`,
 			);
-			const userNamesCondition = uniqueIdentifiers
-				.filter(id => id.userName)
-				.map(id => "'" + id.userName + "'")
-				.join(',');
-			const userIdCondition = uniqueIdentifiers
-				.filter(id => id.userId)
-				.map(id => "'" + id.userId + "'")
-				.join(',');
-			const machineIdCondition = uniqueIdentifiers
-				.filter(id => id.userMachineId)
-				.map(id => "'" + id.userMachineId + "'")
-				.join(',');
-			if (isEmpty(userNamesCondition) || isEmpty(userIdCondition) || isEmpty(machineIdCondition)) {
-				return {
-					statusCode: 200,
-					isBase64Encoded: false,
-					body: JSON.stringify({ results: [] }),
-				};
-			}
+			const userNamesCondition = [
+				...uniqueIdentifiers.filter(id => id.userName).map(id => "'" + id.userName + "'"),
+				`'${userInfo.userName}'`,
+			].join(',');
+			const userIdCondition = [
+				...uniqueIdentifiers.filter(id => id.userId).map(id => "'" + id.userId + "'"),
+				`'${userInfo.userId}'`,
+			].join(',');
+			const machineIdCondition = [
+				...uniqueIdentifiers.filter(id => id.userMachineId).map(id => "'" + id.userMachineId + "'"),
+				`'${userInfo.machineId}'`,
+			].join(',');
+			// if (isEmpty(userNamesCondition) && isEmpty(userIdCondition) && isEmpty(machineIdCondition)) {
+			// 	console.log(
+			// 		'userInfo did not match anything, returning empty',
+			// 		userInfo,
+			// 		userNamesCondition,
+			// 		userIdCondition,
+			// 		machineIdCondition,
+			// 	);
+			// 	const testQuery = `SELECT reviewId FROM replay_summary WHERE userId in (${userIdCondition} LIMIT 1)`;
+			// 	const testResult = await mysql.query(testQuery);
+			// 	const expectedEmpty = !testResult || testResult.length === 0;
+			// 	return {
+			// 		statusCode: 200,
+			// 		isBase64Encoded: false,
+			// 		body: JSON.stringify({ results: [], expectedEmpty: expectedEmpty }),
+			// 	};
+			// }
+			const finalNameCondition = isEmpty(userNamesCondition) ? `'__invalid__'` : userNamesCondition;
+			const finalIdCondition = isEmpty(userIdCondition) ? `'__invalid__'` : userIdCondition;
+			const finalMachineCondition = isEmpty(machineIdCondition) ? `'__invalid__'` : machineIdCondition;
 			selectClause = `
-				WHERE userId in (${userIdCondition})
+				WHERE userId in (${finalNameCondition}, ${finalIdCondition}, ${finalMachineCondition})
 			`;
 		} else {
 			const userToken = event.pathParameters && event.pathParameters.proxy;
@@ -68,6 +84,16 @@ export default async (event): Promise<any> => {
 				value: Math.abs(result.value) < 1 ? result.value : Math.round(result.value),
 			} as GlobalStat),
 		);
+
+		let expectedEmpty = false;
+		if (results.length === 0) {
+			const testQuery = `SELECT reviewId FROM replay_summary WHERE userId = '${userInfo.userId}' LIMIT 1)`;
+			const testResult = await mysql.query(testQuery);
+			expectedEmpty = !testResult || testResult.length === 0;
+			if (debug) {
+				console.log('empty result, is expected?', expectedEmpty);
+			}
+		}
 		console.log('results', results && results.length);
 		const result = Object.assign(new GlobalStats(), {
 			stats: results,
@@ -75,7 +101,7 @@ export default async (event): Promise<any> => {
 		const response = {
 			statusCode: 200,
 			isBase64Encoded: false,
-			body: JSON.stringify({ result }),
+			body: JSON.stringify({ result, expectedEmpty: expectedEmpty }),
 		};
 		// console.log('sending back success reponse', response);
 		return response;
