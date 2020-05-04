@@ -9,7 +9,7 @@ let connection, connectionPromise;
 
 const connect = async () => {
 	const secretRequest: GetSecretValueRequest = {
-		SecretId: 'rds-connection',
+		SecretId: 'rds-connection-ro',
 	};
 	const secret: SecretInfo = await getSecret(secretRequest);
 	const config = {
