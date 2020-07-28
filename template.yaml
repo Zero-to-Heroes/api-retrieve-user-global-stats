@@ -23,10 +23,13 @@ Resources:
             Timeout: 180
             CodeUri: ./dist/retrieve-overview-global-stats
             MemorySize: 128
+            ReservedConcurrentExecutions: 40
             Policies:
                 - AWSLambdaVPCAccessExecutionRole
                 - AmazonSESFullAccess
                 - SecretsManagerReadWrite
+            Tags:
+                LambdaName: api-retrieve-user-global-stats
             Events:
                 GetGlobalStatsResource:
                     Type: Api

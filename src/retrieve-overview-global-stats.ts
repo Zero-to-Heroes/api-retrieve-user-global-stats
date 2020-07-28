@@ -42,23 +42,6 @@ export default async (event): Promise<any> => {
 				...uniqueIdentifiers.filter(id => id.userMachineId).map(id => "'" + id.userMachineId + "'"),
 				`'${userInfo.machineId}'`,
 			].join(',');
-			// if (isEmpty(userNamesCondition) && isEmpty(userIdCondition) && isEmpty(machineIdCondition)) {
-			// 	console.log(
-			// 		'userInfo did not match anything, returning empty',
-			// 		userInfo,
-			// 		userNamesCondition,
-			// 		userIdCondition,
-			// 		machineIdCondition,
-			// 	);
-			// 	const testQuery = `SELECT reviewId FROM replay_summary WHERE userId in (${userIdCondition} LIMIT 1)`;
-			// 	const testResult = await mysql.query(testQuery);
-			// 	const expectedEmpty = !testResult || testResult.length === 0;
-			// 	return {
-			// 		statusCode: 200,
-			// 		isBase64Encoded: false,
-			// 		body: JSON.stringify({ results: [], expectedEmpty: expectedEmpty }),
-			// 	};
-			// }
 			const finalNameCondition = isEmpty(userNamesCondition) ? `'__invalid__'` : userNamesCondition;
 			const finalIdCondition = isEmpty(userIdCondition) ? `'__invalid__'` : userIdCondition;
 			const finalMachineCondition = isEmpty(machineIdCondition) ? `'__invalid__'` : machineIdCondition;
@@ -87,7 +70,7 @@ export default async (event): Promise<any> => {
 
 		let expectedEmpty = false;
 		if (results.length === 0) {
-			const testQuery = `SELECT reviewId FROM replay_summary WHERE userId = '${userInfo.userId}' LIMIT 1)`;
+			const testQuery = `SELECT reviewId FROM replay_summary WHERE userId = '${userInfo.userId}' LIMIT 1`;
 			const testResult = await mysql.query(testQuery);
 			expectedEmpty = !testResult || testResult.length === 0;
 			if (debug) {
