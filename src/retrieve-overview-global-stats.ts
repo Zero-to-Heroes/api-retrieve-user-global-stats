@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
+import { gzipSync } from 'zlib';
 import db from './db/rds';
 import { GlobalStat } from './model/global-stat';
 import { GlobalStats } from './model/global-stats';
@@ -23,11 +24,10 @@ export default async (event): Promise<any> => {
 			// Hacky, but that's the only place where we have all three to make the links
 			const uniqueIdentifiers = await mysql.query(
 				`
-					SELECT DISTINCT userName, userId, userMachineId 
+					SELECT DISTINCT userName, userId 
 					FROM achievement_stat
 					WHERE userName = '${userInfo.userName || '__invalid__'}' 
 						OR userId = '${userInfo.userId || '__invalid__'}' 
-						OR userMachineId = '${userInfo.machineId || '__invalid__'}'
 				`,
 			);
 			const userNamesCondition = [
@@ -38,15 +38,10 @@ export default async (event): Promise<any> => {
 				...uniqueIdentifiers.filter(id => id.userId).map(id => "'" + id.userId + "'"),
 				`'${userInfo.userId}'`,
 			].join(',');
-			const machineIdCondition = [
-				...uniqueIdentifiers.filter(id => id.userMachineId).map(id => "'" + id.userMachineId + "'"),
-				`'${userInfo.machineId}'`,
-			].join(',');
 			const finalNameCondition = isEmpty(userNamesCondition) ? `'__invalid__'` : userNamesCondition;
 			const finalIdCondition = isEmpty(userIdCondition) ? `'__invalid__'` : userIdCondition;
-			const finalMachineCondition = isEmpty(machineIdCondition) ? `'__invalid__'` : machineIdCondition;
 			selectClause = `
-				WHERE userId in (${finalNameCondition}, ${finalIdCondition}, ${finalMachineCondition})
+				WHERE userId in (${finalNameCondition}, ${finalIdCondition})
 			`;
 		} else {
 			const userToken = event.pathParameters && event.pathParameters.proxy;
@@ -81,10 +76,18 @@ export default async (event): Promise<any> => {
 		const result = Object.assign(new GlobalStats(), {
 			stats: results,
 		} as GlobalStats);
+
+		const stringResults = JSON.stringify({ result, expectedEmpty: expectedEmpty });
+		const gzippedResults = gzipSync(stringResults).toString('base64');
+		console.log('compressed', stringResults.length, gzippedResults.length);
 		const response = {
 			statusCode: 200,
-			isBase64Encoded: false,
-			body: JSON.stringify({ result, expectedEmpty: expectedEmpty }),
+			isBase64Encoded: true,
+			body: gzippedResults,
+			headers: {
+				'Content-Type': 'text/html',
+				'Content-Encoding': 'gzip',
+			},
 		};
 		// console.log('sending back success reponse', response);
 		return response;
