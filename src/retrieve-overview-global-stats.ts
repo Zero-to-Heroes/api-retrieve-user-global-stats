@@ -73,6 +73,7 @@ export default async (event): Promise<any> => {
 			}
 		}
 		console.log('results', results && results.length);
+		await mysql.end();
 		const result = Object.assign(new GlobalStats(), {
 			stats: results,
 		} as GlobalStats);
