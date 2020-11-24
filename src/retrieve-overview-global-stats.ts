@@ -11,12 +11,7 @@ export default async (event): Promise<any> => {
 	try {
 		const mysql = await db.getConnection();
 		const userInfo = JSON.parse(event.body);
-		const debug =
-			userInfo &&
-			(userInfo.userName === 'daedin' || userInfo.userId === 'OW_7fca23da-49df-4254-8ae7-fbee31e22373');
-		if (debug) {
-			console.log('debug mode', userInfo);
-		}
+		console.log('debug mode', userInfo);
 		// console.log('input', JSON.stringify(event));
 		let selectClause = '';
 		if (userInfo) {
@@ -30,6 +25,7 @@ export default async (event): Promise<any> => {
 						OR userId = '${userInfo.userId || '__invalid__'}' 
 				`,
 			);
+			console.log('unique identifiers', uniqueIdentifiers);
 			const userNamesCondition = [
 				...uniqueIdentifiers.filter(id => id.userName).map(id => "'" + id.userName + "'"),
 				`'${userInfo.userName}'`,
@@ -52,27 +48,25 @@ export default async (event): Promise<any> => {
 			SELECT * FROM global_stats 
 			${selectClause}
 		`;
-		if (debug) {
-			console.log('running query', query);
-		}
+		console.log('running query', query);
 		const dbResults = await mysql.query(query);
+		console.log('loaded global stats');
 		const results: readonly GlobalStat[] = dbResults.map(result =>
 			Object.assign(new GlobalStat(), {
 				...result,
 				value: Math.abs(result.value) < 1 ? result.value : Math.round(result.value),
 			} as GlobalStat),
 		);
+		console.log('results', results && results.length);
 
 		let expectedEmpty = false;
 		if (results.length === 0) {
 			const testQuery = `SELECT reviewId FROM replay_summary WHERE userId = '${userInfo.userId}' LIMIT 1`;
 			const testResult = await mysql.query(testQuery);
 			expectedEmpty = !testResult || testResult.length === 0;
-			if (debug) {
-				console.log('empty result, is expected?', expectedEmpty);
-			}
+			console.log('empty result, is expected?', expectedEmpty);
 		}
-		console.log('results', results && results.length);
+
 		await mysql.end();
 		const result = Object.assign(new GlobalStats(), {
 			stats: results,
