@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
+import SqlString from 'sqlstring';
 import { gzipSync } from 'zlib';
 import db from './db/rds';
+import { groupByFunction } from './db/util-functions';
 import { GlobalStat } from './model/global-stat';
 import { GlobalStats } from './model/global-stats';
 
@@ -9,6 +11,7 @@ import { GlobalStats } from './model/global-stats';
 // [1]: https://aws.amazon.com/blogs/compute/node-js-8-10-runtime-now-available-in-aws-lambda/
 export default async (event): Promise<any> => {
 	try {
+		const escape = SqlString.escape;
 		const mysql = await db.getConnection();
 		const userInfo = JSON.parse(event.body);
 		console.log('debug mode', userInfo);
@@ -21,18 +24,18 @@ export default async (event): Promise<any> => {
 				`
 					SELECT DISTINCT userName, userId 
 					FROM achievement_stat
-					WHERE userName = '${userInfo.userName || '__invalid__'}' 
-						OR userId = '${userInfo.userId || '__invalid__'}' 
+					WHERE userName = ${escape(userInfo.userName || '__invalid__')} 
+						OR userId = ${escape(userInfo.userId || '__invalid__')}
 				`,
 			);
 			console.log('unique identifiers', uniqueIdentifiers);
 			const userNamesCondition = [
 				...uniqueIdentifiers.filter(id => id.userName).map(id => "'" + id.userName + "'"),
-				`'${userInfo.userName}'`,
+				`${escape(userInfo.userName)}`,
 			].join(',');
 			const userIdCondition = [
 				...uniqueIdentifiers.filter(id => id.userId).map(id => "'" + id.userId + "'"),
-				`'${userInfo.userId}'`,
+				`${escape(userInfo.userId)}`,
 			].join(',');
 			const finalNameCondition = isEmpty(userNamesCondition) ? `'__invalid__'` : userNamesCondition;
 			const finalIdCondition = isEmpty(userIdCondition) ? `'__invalid__'` : userIdCondition;
@@ -41,7 +44,7 @@ export default async (event): Promise<any> => {
 			`;
 		} else {
 			const userToken = event.pathParameters && event.pathParameters.proxy;
-			selectClause = `WHERE userId = '${userToken}'`;
+			selectClause = `WHERE userId = ${escape(userToken)}`;
 			// console.log('getting stats for user', userToken);
 		}
 		const query = `
@@ -49,19 +52,29 @@ export default async (event): Promise<any> => {
 			${selectClause}
 		`;
 		console.log('running query', query);
-		const dbResults = await mysql.query(query);
+		const dbResults: readonly InternalResult[] = await mysql.query(query);
 		console.log('loaded global stats');
-		const results: readonly GlobalStat[] = dbResults.map(result =>
-			Object.assign(new GlobalStat(), {
-				...result,
-				value: Math.abs(result.value) < 1 ? result.value : Math.round(result.value),
-			} as GlobalStat),
+		const grouped = groupByFunction((result: InternalResult) => result.statKey + '-' + result.statContext)(
+			dbResults,
 		);
+
+		const results: readonly GlobalStat[] = Object.values(grouped).map((stats: readonly InternalResult[]) => {
+			const statRadical = stats[0];
+			const statName = statRadical.statKey;
+			const mergedValue = statName.startsWith('best')
+				? Math.max(...stats.map(stat => stat.value))
+				: stats.map(stat => stat.value).reduce((a, b) => a + b, 0);
+			const finalValue = Math.abs(mergedValue) < 1 ? mergedValue : Math.round(mergedValue);
+			return {
+				...statRadical,
+				value: finalValue,
+			};
+		});
 		console.log('results', results && results.length);
 
 		let expectedEmpty = false;
 		if (results.length === 0) {
-			const testQuery = `SELECT reviewId FROM replay_summary WHERE userId = '${userInfo.userId}' LIMIT 1`;
+			const testQuery = `SELECT reviewId FROM replay_summary WHERE userId = ${escape(userInfo.userId)} LIMIT 1`;
 			const testResult = await mysql.query(testQuery);
 			expectedEmpty = !testResult || testResult.length === 0;
 			console.log('empty result, is expected?', expectedEmpty);
@@ -99,3 +112,11 @@ export default async (event): Promise<any> => {
 };
 
 const isEmpty = (input: string) => !input || input.length === 0;
+
+interface InternalResult {
+	id: number;
+	userId: string;
+	statKey: string;
+	statContext: string;
+	value: number;
+}
