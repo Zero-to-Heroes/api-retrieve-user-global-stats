@@ -21,7 +21,7 @@ Resources:
             Handler: retrieve-overview-global-stats.default
             # Runtime: nodejs8.10
             Runtime: nodejs10.x
-            Timeout: 12
+            Timeout: 20
             CodeUri: ./dist/retrieve-overview-global-stats
             MemorySize: 128
             ReservedConcurrentExecutions: 40
