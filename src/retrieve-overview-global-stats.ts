@@ -13,11 +13,8 @@ export default async (event): Promise<any> => {
 	const escape = SqlString.escape;
 	const mysql = await db.getConnection();
 	const userInfo = JSON.parse(event.body);
-	console.log('debug mode', userInfo);
-	// console.log('input', JSON.stringify(event));
 	let selectClause = '';
 	if (userInfo) {
-		console.log('retrieving from userInfo', userInfo);
 		// Hacky, but that's the only place where we have all three to make the links
 		const uniqueIdentifiers = await mysql.query(
 			`
@@ -27,7 +24,6 @@ export default async (event): Promise<any> => {
 						OR userId = ${escape(userInfo.userId || '__invalid__')}
 				`,
 		);
-		console.log('unique identifiers', uniqueIdentifiers);
 		const userNamesCondition = [
 			...uniqueIdentifiers.filter(id => id.userName).map(id => "'" + id.userName + "'"),
 			`${escape(userInfo.userName)}`,
@@ -44,15 +40,12 @@ export default async (event): Promise<any> => {
 	} else {
 		const userToken = event.pathParameters && event.pathParameters.proxy;
 		selectClause = `WHERE userId = ${escape(userToken)}`;
-		// console.log('getting stats for user', userToken);
 	}
 	const query = `
 			SELECT * FROM global_stats 
 			${selectClause}
 		`;
-	console.log('running query', query);
 	const dbResults: readonly InternalResult[] = await mysql.query(query);
-	console.log('loaded global stats');
 	const grouped = groupByFunction((result: InternalResult) => result.statKey + '-' + result.statContext)(dbResults);
 
 	const results: readonly GlobalStat[] = Object.values(grouped).map((stats: readonly InternalResult[]) => {
@@ -67,14 +60,12 @@ export default async (event): Promise<any> => {
 			value: finalValue,
 		};
 	});
-	console.log('results', results && results.length);
 
 	let expectedEmpty = false;
 	if (results.length === 0) {
 		const testQuery = `SELECT reviewId FROM replay_summary WHERE userId = ${escape(userInfo.userId)} LIMIT 1`;
 		const testResult = await mysql.query(testQuery);
 		expectedEmpty = !testResult || testResult.length === 0;
-		console.log('empty result, is expected?', expectedEmpty);
 	}
 
 	await mysql.end();
@@ -84,7 +75,6 @@ export default async (event): Promise<any> => {
 
 	const stringResults = JSON.stringify({ result, expectedEmpty: expectedEmpty });
 	const gzippedResults = gzipSync(stringResults).toString('base64');
-	console.log('compressed', stringResults.length, gzippedResults.length);
 	const response = {
 		statusCode: 200,
 		isBase64Encoded: true,
@@ -94,7 +84,6 @@ export default async (event): Promise<any> => {
 			'Content-Encoding': 'gzip',
 		},
 	};
-	// console.log('sending back success reponse', response);
 	return response;
 };
 
