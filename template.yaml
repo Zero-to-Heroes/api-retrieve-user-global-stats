@@ -19,19 +19,11 @@ Resources:
         Type: AWS::Serverless::Function
         Properties:
             Handler: retrieve-overview-global-stats.default
-            # Runtime: nodejs8.10
-            Runtime: nodejs12.x
+            Runtime: nodejs16.x
             Timeout: 20
             CodeUri: ./dist/retrieve-overview-global-stats
             MemorySize: 128
             ReservedConcurrentExecutions: 40
-            # https://stackoverflow.com/questions/39144688/aws-lambda-invoke-not-calling-another-lambda-function-node-js
-            # VpcConfig:
-            #     SecurityGroupIds:
-            #         - sg-0ed63616362bf1a30
-            #     SubnetIds:
-            #         - subnet-0b36da5c19637a351
-            #         - subnet-0b730ca9af74a95dd
             Policies:
                 - AWSLambdaVPCAccessExecutionRole
                 - AmazonSESFullAccess
@@ -45,6 +37,23 @@ Resources:
                     Properties:
                         Path: /{proxy+}
                         Method: any
+    RetrieveGlobalStatsFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            Handler: retrieve-overview-global-stats.default
+            Runtime: nodejs16.x
+            CodeUri: ./dist/retrieve-overview-global-stats
+            Timeout: 20
+            Policies:
+                - AWSLambdaVPCAccessExecutionRole
+                - SecretsManagerReadWrite
+                - AmazonSESFullAccess
+                # - arn:aws:iam::478062583808:policy/CloudWatchPolicyForLambda # See https://stackoverflow.com/questions/51166504/disable-cloudwatch-to-monitor-logs-for-lambda-function
+            Tags:
+                LambdaName: api-retrieve-overview-global-stats-2
+            AutoPublishAlias: live
+            FunctionUrlConfig:
+                AuthType: NONE
 
 Outputs:
     ProcessGlobalStatsApi:
