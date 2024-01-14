@@ -4,39 +4,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: API endpoint to retrieve high-level global stats for Firestone users
 
-Globals:
-    Api:
-        # API Gateway regional endpoints
-        EndpointConfiguration: EDGE
-        Cors:
-            AllowMethods: "'*'"
-            AllowHeaders: "'*'"
-            AllowOrigin: "'*'"
-        MinimumCompressionSize: 100
-
 Resources:
-    ProcessGlobalStatsFunction:
-        Type: AWS::Serverless::Function
-        Properties:
-            Handler: retrieve-overview-global-stats.default
-            Runtime: nodejs16.x
-            Timeout: 20
-            CodeUri: ./dist/retrieve-overview-global-stats
-            MemorySize: 128
-            ReservedConcurrentExecutions: 40
-            Policies:
-                - AWSLambdaVPCAccessExecutionRole
-                - AmazonSESFullAccess
-                - SecretsManagerReadWrite
-                - arn:aws:iam::478062583808:policy/CloudWatchPolicyForLambda # See https://stackoverflow.com/questions/51166504/disable-cloudwatch-to-monitor-logs-for-lambda-function
-            Tags:
-                LambdaName: api-retrieve-user-global-stats
-            Events:
-                GetGlobalStatsResource:
-                    Type: Api
-                    Properties:
-                        Path: /{proxy+}
-                        Method: any
     RetrieveGlobalStatsFunction:
         Type: AWS::Serverless::Function
         Properties:
@@ -44,20 +12,16 @@ Resources:
             Runtime: nodejs16.x
             CodeUri: ./dist/retrieve-overview-global-stats
             Timeout: 20
+            Layers:
+                - !Sub "arn:aws:lambda:${AWS::Region}:580247275435:layer:LambdaInsightsExtension:14"
             Policies:
                 - AWSLambdaVPCAccessExecutionRole
                 - SecretsManagerReadWrite
                 - AmazonSESFullAccess
+                - arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy
                 # - arn:aws:iam::478062583808:policy/CloudWatchPolicyForLambda # See https://stackoverflow.com/questions/51166504/disable-cloudwatch-to-monitor-logs-for-lambda-function
             Tags:
                 LambdaName: api-retrieve-overview-global-stats-2
             AutoPublishAlias: live
             FunctionUrlConfig:
                 AuthType: NONE
-
-Outputs:
-    ProcessGlobalStatsApi:
-        Description: URL to retrieve global stats for Firestone users
-        Value: !Sub 'https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/globalStats'
-        Export:
-            Name: ProcessGlobalStatsApi
